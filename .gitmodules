@@ -1,0 +1,3 @@
+[submodule "eth-lib"]
+	path = eth-lib
+	url = git@github.com:Gena2018115rus/eth-lib.git
