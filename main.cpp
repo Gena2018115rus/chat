@@ -146,8 +146,9 @@ int main(int argc, char *argv[])
                 std::cerr << "Error occurred while sending headers to new connection" << std::endl;
             }
         }, [&](client_ref_t client) {
+            auto input_buf = client.input_buf();
             std::smatch splitted;
-            if (regex_match(client.input_buf(), splitted, std::regex{"([^]*?\r\n)\r\n([^]*)"})) { // мб сильно сэкономит память если я буду не .str(2) делать, а только 1 захвал и .suffix()
+            if (regex_match(input_buf, splitted, std::regex{"([^]*?\r\n)\r\n([^]*)"})) { // мб сильно сэкономит память если я буду не .str(2) делать, а только 1 захвал и .suffix()
                 auto headers = splitted.str(1);
 //                                std::cout << headers << std::endl;
                 std::smatch m;
@@ -165,15 +166,15 @@ int main(int argc, char *argv[])
                     // }
                     
                     // if (flag) {
-                    if (splitted.str().starts_with("POST /message")) { // clang on androin fails here, but version above doesn't work on desktop
-                        auto message = std::regex_replace(splitted.str(), std::regex{"[^]*?\r\n\r\n"}, "", std::regex_constants::format_first_only);
+                    if (input_buf.starts_with("POST /message")) { // clang on androin fails here and version above doesn't work on desktop?
+                        auto message = std::regex_replace(input_buf, std::regex{"[^]*?\r\n\r\n"}, "", std::regex_constants::format_first_only);
     //                            std::cout << message;
                         static unsigned long long unique_number;
                         std::time_t cur_time = std::time(nullptr);
                         std::ofstream("messages/" + (std::ctime(&cur_time) + (" - " + std::to_string(unique_number++))), std::ios::binary) << message; // висячий \r\n (или \n?) не выводится?
                         send_to_all(addr + ": " + message);
                     } else {
-                        std::cout << splitted.str() << std::endl;
+                        std::cout << input_buf << std::endl;
                     }
                 }
             }
