@@ -17,7 +17,6 @@ extern "C"
 #include <thread>
 //#include <mutex>
 #include <map>
-#include <regex>
 #include <unordered_map>
 #include "eth-lib/eth-lib.hpp"
 
@@ -121,9 +120,7 @@ int main(int argc, char *argv[])
 
         listener.run([](client_ref_t client) {
             // сейчас я даже на POST /messge отвечаю так
-            char out_buf[] = R"(HTTP/1.1 200 OK
-
-                    <!DOCTYPE html>
+            char out_buf[] = R"(<!DOCTYPE html>
                     <html lang="ru">
                     <head>
                         <meta charset="UTF-8">
@@ -138,46 +135,16 @@ int main(int argc, char *argv[])
                         ta.value = '';
                     ">Отправить</button>
                     <H2>Сейчас также спрашивают:</H2>
-                    <!-- </body>
-                    </html> -->
                     <pre>
             )";
             if (!client.write(out_buf)) {
                 std::cerr << "Error occurred while sending headers to new connection" << std::endl;
             }
-        }, [&](client_ref_t client) {
-            auto input_buf = client.input_buf();
-            std::smatch splitted;
-            if (regex_match(input_buf, splitted, std::regex{"([^]*?\r\n)\r\n([^]*)"})) { // мб сильно сэкономит память если я буду не .str(2) делать, а только 1 захвал и .suffix()
-                auto headers = splitted.str(1);
-//                                std::cout << headers << std::endl;
-                std::smatch m;
-                if (regex_search(headers, m, std::regex{"Content-Length: (\\d+)\r\n"})
-                    && splitted.str(2).size() >= std::stoull(m[1])) {
-                    auto addr = client.addr();
-                    client.disconnect();
-                    
-                    // auto s = client_in_bufs[client_fd];
-                    // auto index = s.find("\r\n");
-                    // bool flag = false;
-                    // if (index != (size_t)-1) {
-                    //     s = {s.begin(), s.begin() + index};
-                    //     flag = s == "POST /message";
-                    // }
-                    
-                    // if (flag) {
-                    if (input_buf.starts_with("POST /message")) { // clang on androin fails here and version above doesn't work on desktop?
-                        auto message = std::regex_replace(input_buf, std::regex{"[^]*?\r\n\r\n"}, "", std::regex_constants::format_first_only);
-    //                            std::cout << message;
-                        static unsigned long long unique_number;
-                        std::time_t cur_time = std::time(nullptr);
-                        std::ofstream("messages/" + (std::ctime(&cur_time) + (" - " + std::to_string(unique_number++))), std::ios::binary) << message; // висячий \r\n (или \n?) не выводится?
-                        send_to_all(addr + ": " + message);
-                    } else {
-                        std::cout << input_buf << std::endl;
-                    }
-                }
-            }
+        }, [&](std::string addr, std::string msg) {
+            static unsigned long long unique_number;
+            std::time_t cur_time = std::time(nullptr);
+            std::ofstream("messages/" + (std::ctime(&cur_time) + (" - " + std::to_string(unique_number++))), std::ios::binary) << msg; // висячий \r\n (или \n?) не выводится?
+            send_to_all(addr + ": " + msg);
         });
     }
     else // client mode
