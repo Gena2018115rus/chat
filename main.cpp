@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
 
         auto send_to_all = [&](std::string out_str) {
             std::cout << out_str << std::endl;
-            listener.send_to_all("<!--<br>-->\n" + out_str + "<!--<br>\n>-->");
+            listener.send_to_all("\n" + out_str);
         };
         
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -182,71 +182,31 @@ int main(int argc, char *argv[])
     }
     else // client mode
     {
-        int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-        if (sockfd == -1)
-        {
-            std::cerr << "socket() error." << std::endl;
-            exit(-5);
-        }
-
-        struct addrinfo *servinfo;
-        const struct addrinfo hints = {
-            .ai_family = AF_INET,
-            .ai_socktype = SOCK_STREAM,
-        };
-
         (std::cout << "Введите адрес сервера: ").flush();
         std::string addr;
         std::cin >> addr;
         (std::cout << "Введите порт сервера [0-65535]: ").flush();
-        unsigned short port;
+        std::string port;
         std::cin >> port;
-        int r = getaddrinfo(addr.data(), std::to_string(port).data(), &hints, &servinfo);
-        if (r != 0)
-        {
-            std::cerr << "getaddrinfo() error " << r << '.' << std::endl;
-            exit(-1);
-        }
-        if (!servinfo)
-        {
-            std::cerr << "addrinfo list is empty." << std::endl;
-            exit(-2);
-        }
 
-        if (connect(sockfd, (struct sockaddr *)servinfo->ai_addr, sizeof(struct sockaddr_in)) != 0)
-        {
-            std::cerr << "connect() error." << std::endl;
-            exit(-6);
-        }
-
-        freeaddrinfo(servinfo);
-
-
-
-
-
-
-
+        client_t client(addr, port);
 
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        (std::cout << '>').flush();
+
         std::thread{[&]
         {
-            for (char in_buf[1024] = {0};;)
-                if (read(sockfd, in_buf, 1023) > 0)
-                    (std::cout << in_buf).flush();
-                else
-                    exit(0);
+            client.listen([](std::string chunk) {
+                std::cout << '\n' << chunk << std::endl;
+            });
         }}.detach();
 
         for (;;)
         {
+            (std::cout << '>').flush();
             std::string out_str;
             std::getline(std::cin, out_str);
-            write(sockfd, out_str.data(), out_str.size() + 1);
+            client.write(out_str);
         }
-
-        close(sockfd);
     }
 
     return 0;
